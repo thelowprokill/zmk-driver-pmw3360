@@ -34,7 +34,7 @@ properties:
   polling-interval:
     type: int
     default: 1000 
-    description: "The time, in microseconds, to wait between sensor polls when operating without an irq configured."
+    description: "The time, in microseconds, between sensor reads. Used as the poll period without an irq, and as the minimum read interval with one."
   invert-x:
     type: boolean
     description:

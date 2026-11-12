@@ -241,6 +241,10 @@ static void pmw3360_work_callback(struct k_work *work) {
 #endif
     }
     else {
+#if defined(CONFIG_INPUT_PIXART_PMW3360_USE_OWN_THREAD)
+        // Rate-limit reads; motion accumulates in the sensor meanwhile.
+        k_usleep(((const struct pmw3360_config *)dev->config)->polling_interval);
+#endif
         pmw3360_set_interrupt(dev, true);
     }
 }
