@@ -155,8 +155,9 @@ static int pmw3389_spi_read_motion_burst(const struct device *dev, uint8_t *val,
 // PMW3389 CPI is 16 bits across two registers: value = cpi/50 - 1 (50..16000).
 static void pmw3389_set_cpi(const struct device *dev, uint32_t cpi) {
     uint16_t val = CLAMP(cpi, 50, 16000) / 50 - 1;
-    pmw3389_spi_write_reg(dev, PMW3389_REG_RESOLUTION_L, val & 0xFF);
+    // High byte first, as QMK does.
     pmw3389_spi_write_reg(dev, PMW3389_REG_RESOLUTION_H, val >> 8);
+    pmw3389_spi_write_reg(dev, PMW3389_REG_RESOLUTION_L, val & 0xFF);
 }
 
 static void pmw3389_gpio_callback(const struct device *gpiob, struct gpio_callback *cb, uint32_t pins) {
@@ -214,6 +215,9 @@ static void pmw3389_read_motion_report(const struct device *dev) {
         pmw3389_spi_read_motion_burst(dev, (uint8_t *) &motion_report, sizeof(motion_report));
     }
 
+    LOG_DBG("motion 0x%02x dx %d dy %d", motion_report.motion,
+            (int16_t)((motion_report.delta_x_h << 8) | motion_report.delta_x_l),
+            (int16_t)((motion_report.delta_y_h << 8) | motion_report.delta_y_l));
     if (motion_report.motion & PMW3389_MOTION_MOT) {
         int16_t dx = (motion_report.delta_x_h << 8) | motion_report.delta_x_l;
         if (config->invert_x) {
@@ -305,7 +309,12 @@ static void pmw3389_async_init(struct k_work *work) {
     uint8_t revision_id = 0;
     int r2 = pmw3389_spi_read_reg(dev, PMW3389_REG_REVISION_ID, &revision_id);
 
-    LOG_DBG("pmw3389 product %d (%d), resivion %d (%d)", product_id, r1, revision_id, r2);
+    if (product_id == 0x47) {
+        LOG_INF("pmw3389 found: product 0x%02x, revision 0x%02x", product_id, revision_id);
+    } else {
+        LOG_ERR("pmw3389 not found: product 0x%02x (err %d), revision 0x%02x (err %d), expected 0x47",
+                product_id, r1, revision_id, r2);
+    }
 
     k_mutex_lock(&data->mutex, K_FOREVER);
 
